@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Best Wind Split</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f4f8;
+      color: #1a202c;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      background: #ffffff;
+      padding: 8px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 3px solid #fc4c02;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+      flex-shrink: 0;
+    }
+    header img.logo { height: 44px; display: block; }
+    .logout-btn {
+      background: #fc4c02;
+      border: none; color: white;
+      padding: 7px 16px; border-radius: 7px;
+      cursor: pointer; font-size: 0.84rem; font-weight: 600;
+      text-decoration: none; letter-spacing: 0.01em;
+    }
+    .logout-btn:hover { background: #e03d00; }
+    .header-user {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .header-athlete {
+      font-size: 0.84rem; font-weight: 600; color: #4a5568;
+    }
+
+    /* ── Controls bar ── */
+    .controls {
+      background: white;
+      padding: 12px 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      flex-shrink: 0;
+    }
+    .controls input[type=text], .controls input[type=number], .controls select {
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 7px 11px;
+      font-size: 0.88rem;
+    }
+    .controls input[type=text] { flex: 1; min-width: 180px; }
+    .controls input[type=number] { width: 95px; }
+    .controls input:focus, .controls select:focus {
+      outline: none; border-color: #fc4c02;
+    }
+    .btn {
+      padding: 8px 16px; border-radius: 8px; border: none;
+      cursor: pointer; font-size: 0.88rem; font-weight: 600;
+      white-space: nowrap;
+    }
+    .btn-primary { background: #fc4c02; color: white; }
+    .btn-primary:hover { background: #e03d00; }
+    .btn-secondary { background: #edf2f7; color: #4a5568; }
+    .btn-secondary:hover { background: #e2e8f0; }
+
+    /* Suggestions dropdown */
+    .search-wrap { position: relative; flex: 1; min-width: 180px; }
+    .suggestions {
+      position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+      background: white; border: 1px solid #e2e8f0; border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+      z-index: 9999; max-height: 200px; overflow-y: auto;
+    }
+    .suggestion-item {
+      padding: 9px 13px; cursor: pointer;
+      font-size: 0.84rem; border-bottom: 1px solid #f7fafc;
+    }
+    .suggestion-item:hover { background: #fff5f0; }
+    .suggestion-item:last-child { border-bottom: none; }
+
+    /* ── Main layout ── */
+    .main {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* ── Map ── */
+    #map {
+      flex: 1;
+      min-height: 400px;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 360px;
+      flex-shrink: 0;
+      overflow-y: auto;
+      background: #f0f4f8;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .wind-bar {
+      background: #ebf8ff;
+      border-bottom: 1px solid #bee3f8;
+      padding: 10px 14px;
+      font-size: 0.84rem;
+      color: #2b6cb0;
+    }
+
+    .routes-list { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+
+    /* ── Route card ── */
+    .route-card {
+      background: white;
+      border-radius: 10px;
+      padding: 12px 14px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: border-color 0.15s, transform 0.1s;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .route-card:hover { transform: translateX(2px); }
+    .route-card.active { border-color: #fc4c02; }
+
+    .score-circle {
+      width: 46px; height: 46px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; font-weight: 800; color: white;
+      flex-shrink: 0;
+    }
+    .score-great   { background: #276749; }
+    .score-good    { background: #38a169; }
+    .score-neutral { background: #a0aec0; }
+    .score-bad     { background: #dd6b20; }
+    .score-terrible{ background: #c53030; }
+
+    .card-body { flex: 1; min-width: 0; }
+    .card-name {
+      font-size: 0.9rem; font-weight: 700;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-bottom: 4px;
+    }
+    .card-meta { font-size: 0.77rem; color: #718096; margin-bottom: 4px; }
+    .card-advice { font-size: 0.78rem; color: #2d3748; }
+    .card-btn {
+      font-size: 0.75rem; font-weight: 600; padding: 4px 10px;
+      border-radius: 6px; border: none; cursor: pointer;
+      text-decoration: none; display: inline-block;
+    }
+    .card-btn-strava { background: #fc4c02; color: white; }
+    .card-btn-strava:hover { background: #e03d00; }
+    .card-btn-gpx { background: #2b6cb0; color: white; }
+    .card-btn-gpx:hover { background: #2c5282; }
+    .card-btn-share { background: #edf2f7; color: #4a5568; }
+    .card-btn-share:hover { background: #e2e8f0; }
+    .card-btn-garmin { background: #1a73e8; color: white; }
+    .card-btn-garmin:hover { background: #1558b0; }
+
+    /* Share popup */
+    .share-popup {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      background: white; border-radius: 14px; padding: 24px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+      z-index: 9999; width: 300px;
+    }
+    .share-popup h3 { margin-bottom: 14px; font-size: 1rem; }
+    .share-option {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: 8px; cursor: pointer;
+      font-size: 0.9rem; margin-bottom: 8px;
+      border: 1px solid #e2e8f0;
+    }
+    .share-option:hover { background: #f7fafc; }
+    .share-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+      z-index: 9998;
+    }
+
+    /* ── Kaart-preview modal ── */
+    #card-preview-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+      z-index: 9999; display: none;
+      align-items: center; justify-content: center;
+    }
+    #card-preview-overlay.active { display: flex; }
+    #card-preview-box {
+      background: #1a202c; border-radius: 14px;
+      padding: 20px; max-width: 92vw;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    #card-preview-box img {
+      width: 100%; max-width: 820px; border-radius: 8px;
+      display: block;
+    }
+    #card-preview-box .preview-actions {
+      display: flex; gap: 10px; justify-content: flex-end;
+    }
+
+    /* Rank badge */
+    .rank {
+      font-size: 0.7rem; font-weight: 700; color: #718096;
+      margin-bottom: 2px;
+    }
+
+    /* ── Legend ── */
+    .legend {
+      position: absolute;
+      bottom: 28px; right: 10px;
+      background: white;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.78rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      z-index: 1000;
+      pointer-events: none;
+    }
+    .legend-title { font-weight: 700; margin-bottom: 6px; color: #2d3748; }
+    .legend-row { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+    .legend-line { width: 28px; height: 4px; border-radius: 2px; }
+
+    /* Bron-toggle (eigen ritten / opgeslagen routes) */
+    .source-toggle {
+      display: flex;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .source-btn {
+      padding: 7px 13px;
+      border: none;
+      background: white;
+      font-size: 0.83rem;
+      font-weight: 600;
+      color: #718096;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s, color 0.15s;
+    }
+    .source-btn + .source-btn { border-left: 1.5px solid #e2e8f0; }
+    .source-btn.source-active { background: #fc4c02; color: white; }
+    .source-btn:hover:not(.source-active) { background: #fff5f0; color: #fc4c02; }
+
+
+    /* ── Empty/loading states ── */
+    .state-msg { padding: 24px 16px; text-align: center; color: #a0aec0; font-size: 0.88rem; }
+
+    /* ── Login ── */
+    .login-wrap {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+    }
+    .login-card {
+      background: white; border-radius: 18px;
+      padding: 52px 44px; text-align: center;
+      box-shadow: 0 6px 32px rgba(0,0,0,0.10);
+      max-width: 440px; width: 100%;
+      border-top: 4px solid #fc4c02;
+    }
+    .login-card p { color: #718096; margin-bottom: 32px; line-height: 1.65; font-size: 0.95rem; }
+    .strava-btn {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: #fc4c02; color: white; text-decoration: none;
+      padding: 13px 26px; border-radius: 10px;
+      font-size: 0.95rem; font-weight: 600;
+    }
+    .strava-btn:hover { background: #e03d00; }
+
+    /* ── Wind arrow overlay ── */
+    .wind-arrow-box {
+      position: absolute; top: 10px; right: 10px;
+      background: white; border-radius: 10px;
+      padding: 8px 12px; font-size: 0.78rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      z-index: 1000; text-align: center; min-width: 80px;
+    }
+    .wind-arrow-box .arrow {
+      font-size: 1.5rem;
+      display: block;
+      transition: transform 0.5s;
+    }
+
+    @media (max-width: 640px) {
+      .main { flex-direction: column-reverse; }
+      .sidebar { width: 100%; max-height: 50vh; }
+      #map { min-height: 300px; }
+      .controls input[type=number] { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <img src="/static/logo.png" alt="Best Wind Split" class="logo">
+  {% if logged_in %}
+    <div class="header-user">
+      {% if athlete.firstname %}
+        <span class="header-athlete">{{ athlete.firstname }}</span>
+      {% endif %}
+      <a href="/logout" class="logout-btn">Uitloggen</a>
+    </div>
+  {% endif %}
+</header>
+
+{% if not logged_in %}
+<div class="login-wrap">
+  <div class="login-card">
+    <img src="/static/logo.png" alt="Best Wind Split" style="height:110px;margin-bottom:24px;display:block;margin-left:auto;margin-right:auto;">
+    <p>Koppel Strava en ontdek welke route vandaag de gunstigste wind heeft — inclusief kaart met mee- en tegenwindkleuren.</p>
+    <a href="/login" class="strava-btn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+        <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/>
+      </svg>
+      Inloggen met Strava
+    </a>
+  </div>
+</div>
+
+{% else %}
+
+<!-- Controls bar -->
+<div class="controls">
+  <div class="search-wrap">
+    <input type="text" id="address-input"
+           placeholder="🔍  Postcode, adres of plaatsnaam…"
+           oninput="onAddressInput()" onkeydown="onAddressKey(event)" autocomplete="off"/>
+    <div class="suggestions" id="suggestions" style="display:none;"></div>
+  </div>
+  <button class="btn btn-secondary" onclick="useMyLocation()">📍 Mijn locatie</button>
+  <div class="source-toggle" id="source-toggle" style="display:none;">
+    <button id="src-activities" class="source-btn source-active" onclick="setSource('activities')">🚴 Eigen ritten</button>
+    <button id="src-saved"      class="source-btn"               onclick="setSource('saved')">🗺️ Strava routes</button>
+  </div>
+  <label style="font-size:0.82rem;color:#718096;white-space:nowrap;">
+    Vertrektijd:
+    <input type="datetime-local" id="start-time" style="margin-left:4px;width:175px;"/>
+  </label>
+  <span id="route-filters" style="display:contents;">
+  <label style="font-size:0.82rem;color:#718096;white-space:nowrap;">
+    Minimaal:
+    <select id="min-dist" style="margin-left:4px;" onchange="applyFilters()">
+      <option value="0">Geen minimum</option>
+      <option value="20">20 km</option>
+      <option value="40">40 km</option>
+      <option value="60">60 km</option>
+      <option value="80">80 km</option>
+      <option value="100">100 km</option>
+    </select>
+  </label>
+  <label style="font-size:0.82rem;color:#718096;white-space:nowrap;">
+    Maximaal:
+    <select id="dist-filter" style="margin-left:4px;" onchange="applyFilters()">
+      <option value="9999">Geen maximum</option>
+      <option value="30">&lt; 30 km</option>
+      <option value="60">&lt; 60 km</option>
+      <option value="100">&lt; 100 km</option>
+      <option value="150">&lt; 150 km</option>
+    </select>
+  </label>
+  </span>
+  <label style="font-size:0.82rem;color:#718096;white-space:nowrap;">
+    Straal:
+    <select id="radius" style="margin-left:4px;">
+      <option value="20">20 km</option>
+      <option value="40" selected>40 km</option>
+      <option value="75">75 km</option>
+      <option value="150">150 km</option>
+    </select>
+  </label>
+  <input type="hidden" id="lat"/>
+  <input type="hidden" id="lon"/>
+  <button class="btn btn-primary" onclick="search()">🚴 Zoeken</button>
+  <span title="Winddata van Open-Meteo (open-meteo.com) — gratis, open-source weermodel op basis van GFS &amp; ECMWF. Uurlijkse voorspelling tot 7 dagen vooruit, geen API-key nodig."
+        style="cursor:help;font-size:1rem;color:#a0aec0;" >ℹ️</span>
+</div>
+
+
+<!-- Map + Sidebar -->
+<div class="main">
+  <div id="map">
+    <!-- Wind arrow overlay -->
+    <div class="wind-arrow-box" id="wind-arrow-box" style="display:none;">
+      <span class="arrow" id="wind-arrow">↑</span>
+      <div id="wind-arrow-label" style="color:#718096;margin-top:2px;"></div>
+    </div>
+    <!-- Legend -->
+    <div class="legend">
+      <div class="legend-title">Windinvloed</div>
+      <div class="legend-row"><div class="legend-line" style="background:#38a169;"></div> Meewind</div>
+      <div class="legend-row"><div class="legend-line" style="background:#f6ad55;"></div> Zijwind</div>
+      <div class="legend-row"><div class="legend-line" style="background:#e53e3e;"></div> Tegenwind</div>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <div class="wind-bar" id="wind-bar" style="display:none;"></div>
+    <div class="routes-list" id="routes-list">
+      <p class="state-msg">Voer een locatie in en klik Zoeken.</p>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
+<script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script>
+{% if logged_in %}
+
+// ── Default start time to current hour ───────────────────────────────────────
+(function() {
+  const now = new Date();
+  now.setMinutes(0, 0, 0);
+  const pad = n => String(n).padStart(2, '0');
+  const local = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:00`;
+  document.getElementById('start-time').value = local;
+  document.getElementById('source-toggle').style.display = '';
+})();
+
+// ── Map init ──────────────────────────────────────────────────────────────────
+const map = L.map('map').setView([52.37, 4.9], 9);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© <a href="https://carto.com/">CARTO</a> © <a href="https://openstreetmap.org">OpenStreetMap</a>',
+  maxZoom: 19
+}).addTo(map);
+
+let routeLayers = {};
+let activeId = null;
+let allRoutes = [];
+let currentSource = 'activities';
+
+// ── Color helpers ─────────────────────────────────────────────────────────────
+function cosToColor(v) {
+  // v: -1 (headwind) → 0 (cross) → 1 (tailwind)
+  // red → yellow → green
+  v = Math.max(-1, Math.min(1, v));
+  if (v >= 0) {
+    const t = v;
+    const r = Math.round(246 * (1-t) + 39  * t);
+    const g = Math.round(173 * (1-t) + 161 * t);
+    const b = Math.round( 85 * (1-t) + 105 * t);
+    return `rgb(${r},${g},${b})`;
+  } else {
+    const t = v + 1; // 0..1
+    const r = Math.round(229 * (1-t) + 246 * t);
+    const g = Math.round( 62 * (1-t) + 173 * t);
+    const b = Math.round( 62 * (1-t) +  85 * t);
+    return `rgb(${r},${g},${b})`;
+  }
+}
+
+function scoreClass(s) {
+  if (s >= 8)  return 'score-great';
+  if (s >= 6)  return 'score-good';
+  if (s >= 4)  return 'score-neutral';
+  if (s >= 2)  return 'score-bad';
+  return 'score-terrible';
+}
+
+// ── Draw route on map (1 route at a time) ────────────────────────────────────
+function clearMap() {
+  Object.values(routeLayers).flat().forEach(l => map.removeLayer(l));
+  routeLayers = {};
+}
+
+function drawRoute(route) {
+  clearMap();
+  const id = route.id;
+  const layers = [];
+  const pts = route.map_points;
+  const cos = route.segment_cos;
+
+  // Colored segments + collect all latlngs for decorator
+  const allLatLngs = [pts[0]];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const color = cosToColor(cos[i]);
+    const seg = L.polyline([pts[i], pts[i+1]], {
+      color, weight: 6, opacity: 0.92,
+      lineCap: 'round', lineJoin: 'round'
+    }).addTo(map);
+    layers.push(seg);
+    allLatLngs.push(pts[i+1]);
+  }
+
+  // Direction arrows (invisible polyline + decorator)
+  const ghostLine = L.polyline(allLatLngs, { opacity: 0, weight: 0 });
+  const decorator = L.polylineDecorator(ghostLine, {
+    patterns: [{
+      offset: '8%', repeat: '18%',
+      symbol: L.Symbol.arrowHead({
+        pixelSize: 9, polygon: false,
+        pathOptions: { color: 'white', weight: 2.5, opacity: 0.85 }
+      })
+    }]
+  }).addTo(map);
+  layers.push(ghostLine, decorator);
+
+  // Start marker – groene knop met "▶"
+  const startIcon = L.divIcon({
+    html: `<div style="
+      background:#38a169;color:white;border-radius:50%;
+      width:30px;height:30px;display:flex;align-items:center;
+      justify-content:center;font-size:13px;font-weight:800;
+      border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.35);">▶</div>`,
+    className: '', iconSize: [30, 30], iconAnchor: [15, 15]
+  });
+  const startMarker = L.marker(pts[0], { icon: startIcon, zIndexOffset: 1000 })
+    .bindTooltip('Start', { permanent: false }).addTo(map);
+  layers.push(startMarker);
+
+  // End marker – donkere knop met vlag
+  const endIcon = L.divIcon({
+    html: `<div style="
+      background:#2d3748;color:white;border-radius:50%;
+      width:24px;height:24px;display:flex;align-items:center;
+      justify-content:center;font-size:13px;
+      border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.35);">🏁</div>`,
+    className: '', iconSize: [24, 24], iconAnchor: [12, 12]
+  });
+  const endMarker = L.marker(pts[pts.length - 1], { icon: endIcon, zIndexOffset: 999 })
+    .bindTooltip('Finish', { permanent: false }).addTo(map);
+  layers.push(endMarker);
+
+  routeLayers[id] = layers;
+  map.fitBounds(pts, { padding: [40, 40] });
+}
+
+function selectRoute(id) {
+  if (activeId === id) return;
+  const prev = activeId;
+  activeId = id;
+
+  if (prev !== null) {
+    const prevCard = document.querySelector(`.route-card[data-id="${prev}"]`);
+    if (prevCard) prevCard.classList.remove('active');
+  }
+
+  const r = allRoutes.find(x => x.id === id);
+  if (r) drawRoute(r);
+
+  const card = document.querySelector(`.route-card[data-id="${id}"]`);
+  if (card) {
+    card.classList.add('active');
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+// ── Geocoding ─────────────────────────────────────────────────────────────────
+let geocodeTimer = null;
+function onAddressInput() {
+  clearTimeout(geocodeTimer);
+  const q = document.getElementById('address-input').value.trim();
+  if (q.length < 3) { hideSuggestions(); return; }
+  geocodeTimer = setTimeout(() => fetchSuggestions(q), 350);
+}
+function onAddressKey(e) {
+  if (e.key === 'Enter') { clearTimeout(geocodeTimer); fetchSuggestions(document.getElementById('address-input').value.trim()); }
+  if (e.key === 'Escape') hideSuggestions();
+}
+function fetchSuggestions(q) {
+  fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=6`, { headers: {'Accept-Language':'nl'} })
+    .then(r => r.json())
+    .then(results => {
+      if (!results.length) { hideSuggestions(); return; }
+      const box = document.getElementById('suggestions');
+      box.innerHTML = results.map(r =>
+        `<div class="suggestion-item" onclick="selectLocation(${r.lat},${r.lon},'${r.display_name.replace(/'/g,"\\'")}')">
+           ${r.display_name}
+         </div>`
+      ).join('');
+      box.style.display = 'block';
+    });
+}
+function selectLocation(lat, lon, label) {
+  document.getElementById('lat').value = parseFloat(lat).toFixed(5);
+  document.getElementById('lon').value = parseFloat(lon).toFixed(5);
+  document.getElementById('address-input').value = label;
+  hideSuggestions();
+  search();
+}
+function hideSuggestions() { document.getElementById('suggestions').style.display = 'none'; }
+document.addEventListener('click', e => { if (!e.target.closest('.search-wrap')) hideSuggestions(); });
+
+// ── GPS ───────────────────────────────────────────────────────────────────────
+function useMyLocation() {
+  if (!navigator.geolocation) { alert('Locatie niet beschikbaar.'); return; }
+  navigator.geolocation.getCurrentPosition(pos => {
+    document.getElementById('lat').value = pos.coords.latitude.toFixed(5);
+    document.getElementById('lon').value = pos.coords.longitude.toFixed(5);
+    document.getElementById('address-input').value = 'Mijn locatie';
+    search();
+  }, () => alert('Kon locatie niet ophalen.'));
+}
+
+// ── Distance filter ───────────────────────────────────────────────────────────
+function applyFilters() {
+  const minKm = Number(document.getElementById('min-dist').value);
+  const maxKm = Number(document.getElementById('dist-filter').value);
+  const filtered = allRoutes.filter(r => r.distance_km >= minKm && r.distance_km <= maxKm);
+
+  const list = document.getElementById('routes-list');
+  if (!filtered.length) {
+    list.innerHTML = '<p class="state-msg">Geen routes in dit afstandsbereik.</p>';
+    clearMap();
+    activeId = null;
+    return;
+  }
+  renderCards(filtered);
+  selectRoute(filtered[0].id);
+}
+
+// ── Load & render routes ──────────────────────────────────────────────────────
+function loadRoutes() {
+  const lat = document.getElementById('lat').value;
+  const lon = document.getElementById('lon').value;
+  const radius = document.getElementById('radius').value;
+  if (!lat || !lon) { alert('Voer eerst een locatie in.'); return; }
+
+  clearMap();
+  activeId = null;
+  allRoutes = [];
+
+  const bronLabel = currentSource === 'saved' ? 'Strava routes' : 'eigen ritten';
+  document.getElementById('routes-list').innerHTML = `<p class="state-msg">⏳ ${bronLabel.charAt(0).toUpperCase() + bronLabel.slice(1)} en winddata ophalen…</p>`;
+  document.getElementById('wind-bar').style.display = 'none';
+  document.getElementById('wind-arrow-box').style.display = 'none';
+
+  const startTime = document.getElementById('start-time').value;
+  fetch(`/api/routes?lat=${lat}&lon=${lon}&radius=${radius}&start_time=${encodeURIComponent(startTime)}&source=${currentSource}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        document.getElementById('routes-list').innerHTML = `<p class="state-msg">❌ ${data.error}</p>`;
+        return;
+      }
+      if (!data.length) {
+        document.getElementById('routes-list').innerHTML = `<p class="state-msg">Geen routes gevonden binnen ${radius} km.</p>`;
+        return;
+      }
+      allRoutes = data;
+      renderAll(data);
+    })
+    .catch(e => {
+      document.getElementById('routes-list').innerHTML = `<p class="state-msg">❌ ${e.message}</p>`;
+    });
+}
+
+
+function renderAll(routes) {
+  // Wind bar
+  const w = routes[0];
+  const windBar = document.getElementById('wind-bar');
+  windBar.style.display = 'block';
+  const st = document.getElementById('start-time').value;
+  const timeLabel = st ? ` om ${st.replace('T',' ')}` : '';
+  const bronTekst = currentSource === 'saved' ? 'Strava routes' : 'eigen ritten';
+  windBar.innerHTML = `💨 Wind${timeLabel}: <strong>${w.wind_speed} km/u uit het ${w.wind_dir_label}</strong> (${w.wind_direction}°) &nbsp;·&nbsp; ${routes.length} ${bronTekst} gevonden`;
+
+  // Wind arrow overlay
+  const arrowBox = document.getElementById('wind-arrow-box');
+  arrowBox.style.display = 'block';
+  document.getElementById('wind-arrow').style.transform = `rotate(${w.wind_direction + 180}deg)`;
+  document.getElementById('wind-arrow-label').textContent = `${w.wind_speed} km/u`;
+
+  applyFilters();
+}
+
+const _wsRoutes = {};
+
+function renderCards(routes) {
+  const ranks = ['🥇', '🥈', '🥉'];
+  const list = document.getElementById('routes-list');
+  routes.forEach(r => { _wsRoutes[r.id] = r; });
+  list.innerHTML = routes.map((r, i) => {
+    const dirText = r.best_direction === 'heen'
+      ? '➡️ Rijd in de <strong>originele richting</strong>'
+      : '⬅️ Rijd in <strong>omgekeerde richting</strong>';
+    const shelterHtml = r.shelter_advice
+      ? `<div style="background:#f0fff4;border:1px solid #c6f6d5;border-radius:6px;padding:6px 8px;margin-top:6px;font-size:0.76rem;color:#276749;">${r.shelter_advice}</div>`
+      : '';
+    return `
+      <div class="route-card" data-id="${r.id}" onclick="selectRoute(${r.id})">
+        <div>
+          <div class="rank">${i < 3 ? ranks[i] : '#'+(i+1)}</div>
+          <div class="score-circle ${scoreClass(r.score_10)}">${r.score_10}</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">${r.name}</div>
+          <div class="card-meta">🛣️ ${r.distance_km} km &nbsp;⛰️ ${r.elevation_gain} m &nbsp;🔥 ${r.calories} kcal &nbsp;📍 ${r.distance_from_you_km} km</div>
+          <div class="card-advice">
+            ${dirText}<br>
+            ${r.wind_icon} ${r.wind_label}
+          </div>
+          ${shelterHtml}
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+            <a href="${r.strava_url}" target="_blank" class="card-btn card-btn-strava" onclick="event.stopPropagation()">Strava →</a>
+            <a href="/gpx/${r.item_type}/${r.item_id}" class="card-btn card-btn-gpx" onclick="event.stopPropagation()" title="Download GPX voor Garmin, Wahoo, Komoot…">⬇️ GPX</a>
+            <button class="card-btn card-btn-garmin" onclick="event.stopPropagation();sendToGarmin('/gpx/${r.item_type}/${r.item_id}')" title="Download GPX en open Garmin Connect import">📲 Garmin</button>
+            <button class="card-btn card-btn-share" onclick="event.stopPropagation();shareRoute(${r.item_id},'${r.name.replace(/'/g,"\\'")}','${r.strava_url}')">🔗 Delen</button>
+            <button class="card-btn" style="background:#fc4c02;color:#fff;" onclick="event.stopPropagation();deelOpStrava(_wsRoutes[${r.id}])">📸 Strava</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── Bron-toggle ───────────────────────────────────────────────────────────────
+function setSource(src) {
+  currentSource = src;
+  document.getElementById('src-activities').classList.toggle('source-active', src === 'activities');
+  document.getElementById('src-saved').classList.toggle('source-active', src === 'saved');
+  if (document.getElementById('lat').value) search();
+}
+
+function search() {
+  loadRoutes();
+}
+
+
+// ── Naar Garmin ───────────────────────────────────────────────────────────────
+function sendToGarmin(gpxUrl) {
+  // Eerst Garmin Connect openen (synchroon, anders blokkeert popup-blocker)
+  window.open('https://connect.garmin.com/modern/import-data', '_blank');
+  // Dan GPX downloaden
+  const a = document.createElement('a');
+  a.href = gpxUrl;
+  a.click();
+}
+
+// ── Strava deelkaart: screenshot van het kaartje zoals zichtbaar ─────────
+async function deelOpStrava(route) {
+  selectRoute(route.id);
+  showToast('📸 Kaart laden…');
+  await new Promise(r => setTimeout(r, 900));
+
+  const mapEl = document.getElementById('map');
+  let mapCanvas;
+  try {
+    mapCanvas = await html2canvas(mapEl, {
+      useCORS: true,
+      allowTaint: false,
+      scale: 1,
+      logging: false,
+      imageTimeout: 8000,
+    });
+  } catch (e) {
+    showToast('⚠️ Screenshot mislukt — probeer opnieuw');
+    return;
+  }
+
+  mapCanvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const img = document.getElementById('card-preview-img');
+    img.src = url;
+    window._previewBlob = blob;
+    window._previewName = route.name;
+    window._previewSharetxt = `${route.name} — Best Wind Split score ${route.score_10} 💨`;
+    document.getElementById('card-preview-overlay').classList.add('active');
+    showToast('');
+  }, 'image/png');
+}
+
+function closeCardPreview() {
+  document.getElementById('card-preview-overlay').classList.remove('active');
+  window._previewBlob = null;
+}
+
+function triggerCardDownload() {
+  const blob = window._previewBlob;
+  if (!blob) return;
+  const url = URL.createObjectURL(blob);
+  const sharetxt = window._previewSharetxt || '';
+  if (navigator.share && navigator.canShare &&
+      navigator.canShare({ files: [new File([blob], 'windsplit.png', { type: 'image/png' })] })) {
+    navigator.share({
+      title: (window._previewName || 'route') + ' – Best Wind Split',
+      text: sharetxt,
+      files: [new File([blob], 'windsplit.png', { type: 'image/png' })],
+    }).catch(() => downloadCanvas(url, window._previewName));
+  } else {
+    downloadCanvas(url, window._previewName);
+  }
+  closeCardPreview();
+}
+
+function downloadCanvas(url, naam) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'windsplit-' + naam.replace(/[^a-z0-9]/gi,'-').toLowerCase() + '.png';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  // Kleine toast
+  showToast('📸 Kaart opgeslagen — upload in Strava als foto!');
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function showToast(msg) {
+  let t = document.getElementById('ws-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'ws-toast';
+    t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a202c;color:#fff;padding:12px 20px;border-radius:10px;font-size:0.9rem;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.4);transition:opacity .3s;';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.opacity = '0'; }, 3500);
+}
+
+// ── Share route ───────────────────────────────────────────────────────────────
+function shareRoute(id, name, url) {
+  if (navigator.share) {
+    navigator.share({ title: name, text: `Check deze fietsroute: ${name}`, url: url })
+      .catch(() => {});
+    return;
+  }
+  // Fallback popup
+  document.getElementById('share-name').textContent = name;
+  document.getElementById('share-link-input').value = url;
+  document.getElementById('share-copy-msg').style.display = 'none';
+  document.getElementById('share-overlay').style.display = 'block';
+  document.getElementById('share-popup').style.display = 'block';
+}
+function closeShare() {
+  document.getElementById('share-overlay').style.display = 'none';
+  document.getElementById('share-popup').style.display = 'none';
+}
+function copyShareLink() {
+  const inp = document.getElementById('share-link-input');
+  inp.select();
+  inp.setSelectionRange(0, 99999);
+  navigator.clipboard.writeText(inp.value).then(() => {
+    document.getElementById('share-copy-msg').style.display = 'block';
+  }).catch(() => {
+    document.execCommand('copy');
+    document.getElementById('share-copy-msg').style.display = 'block';
+  });
+}
+
+{% endif %}
+</script>
+
+<!-- Share popup -->
+<div id="share-overlay" class="share-overlay" style="display:none;" onclick="closeShare()"></div>
+<div id="share-popup" class="share-popup" style="display:none;">
+  <h3>🔗 Deel route</h3>
+  <p id="share-name" style="font-size:0.85rem;color:#718096;margin-bottom:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></p>
+  <div class="share-option" onclick="copyShareLink()">
+    📋 <span>Kopieer link</span>
+  </div>
+  <p id="share-copy-msg" style="display:none;font-size:0.8rem;color:#38a169;margin:-4px 0 8px 0;">✓ Gekopieerd!</p>
+  <a id="share-wa" class="share-option" style="text-decoration:none;color:inherit;" onclick="this.href='https://wa.me/?text='+encodeURIComponent('Check deze fietsroute: '+document.getElementById('share-link-input').value)" href="#" target="_blank">
+    💬 <span>WhatsApp</span>
+  </a>
+  <a id="share-mail" class="share-option" style="text-decoration:none;color:inherit;" onclick="this.href='mailto:?subject=Fietsroute&body='+encodeURIComponent('Check deze route: '+document.getElementById('share-link-input').value)" href="#" target="_blank">
+    ✉️ <span>E-mail</span>
+  </a>
+  <input type="text" id="share-link-input" style="position:absolute;opacity:0;pointer-events:none;width:1px;" readonly/>
+  <button onclick="closeShare()" style="margin-top:10px;width:100%;padding:8px;border:none;border-radius:8px;background:#edf2f7;cursor:pointer;font-size:0.85rem;">Sluiten</button>
+</div>
+
+<!-- Strava kaart preview -->
+<div id="card-preview-overlay" onclick="if(event.target===this)closeCardPreview()">
+  <div id="card-preview-box">
+    <img id="card-preview-img" src="" alt="Best Wind Split deelkaart" />
+    <div class="preview-actions">
+      <button onclick="closeCardPreview()" style="padding:9px 18px;border-radius:8px;border:none;background:#2d3748;color:#a0aec0;font-size:0.9rem;cursor:pointer;">Sluiten</button>
+      <button id="card-download-btn" onclick="triggerCardDownload()" style="padding:9px 20px;border-radius:8px;border:none;background:#fc4c02;color:#fff;font-weight:700;font-size:0.9rem;cursor:pointer;">⬇️ Download PNG</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
