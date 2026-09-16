@@ -307,10 +307,76 @@
     }
 
     @media (max-width: 640px) {
-      .main { flex-direction: column-reverse; }
-      .sidebar { width: 100%; max-height: 50vh; }
-      #map { min-height: 300px; }
-      .controls input[type=number] { display: none; }
+      header { padding: 6px 12px; }
+      header img.logo { height: 30px; }
+      .logout-btn { padding: 5px 11px; font-size: 0.78rem; }
+      .header-athlete { display: none; }
+
+      .controls {
+        padding: 8px 10px;
+        gap: 6px;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      .controls::-webkit-scrollbar { display: none; }
+      #route-filters { display: none !important; }
+      #start-time-label { display: none !important; }
+
+      .main {
+        flex-direction: column;
+        position: relative;
+        flex: 1;
+        overflow: hidden;
+      }
+      #map {
+        position: absolute;
+        inset: 0;
+        min-height: 0;
+        z-index: 1;
+      }
+      .sidebar {
+        position: absolute;
+        bottom: 0; left: 0; right: 0;
+        width: 100%;
+        max-height: 78vh;
+        background: white;
+        border-radius: 18px 18px 0 0;
+        box-shadow: 0 -4px 24px rgba(0,0,0,0.18);
+        transform: translateY(calc(100% - 58px));
+        transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+        z-index: 400;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .sidebar.panel-open { transform: translateY(0); }
+      .wind-bar { border-radius: 0; }
+
+      .panel-handle {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 10px 16px 8px;
+        cursor: pointer;
+        flex-shrink: 0;
+        user-select: none;
+        -webkit-user-select: none;
+        background: white;
+        border-radius: 18px 18px 0 0;
+      }
+      .panel-handle-bar {
+        width: 38px; height: 4px;
+        background: #cbd5e0; border-radius: 2px;
+        margin-bottom: 6px;
+      }
+      .panel-handle-label {
+        font-size: 0.82rem; font-weight: 600; color: #4a5568;
+      }
+      .routes-list { overflow-y: auto; flex: 1; }
+
+      .legend { bottom: 68px; }
+      .wind-arrow-box { top: 8px; right: 8px; }
     }
   </style>
 </head>
@@ -357,7 +423,7 @@
     <button id="src-activities" class="source-btn source-active" onclick="setSource('activities')">🚴 Eigen ritten</button>
     <button id="src-saved"      class="source-btn"               onclick="setSource('saved')">🗺️ Strava routes</button>
   </div>
-  <label style="font-size:0.82rem;color:#718096;white-space:nowrap;">
+  <label id="start-time-label" style="font-size:0.82rem;color:#718096;white-space:nowrap;">
     Vertrektijd:
     <input type="datetime-local" id="start-time" style="margin-left:4px;width:175px;"/>
   </label>
@@ -418,7 +484,11 @@
     </div>
   </div>
 
-  <div class="sidebar">
+  <div class="sidebar" id="sidebar">
+    <div class="panel-handle" onclick="togglePanel()" id="panel-handle">
+      <div class="panel-handle-bar"></div>
+      <span class="panel-handle-label" id="panel-handle-label">Voer een locatie in en zoek</span>
+    </div>
     <div class="wind-bar" id="wind-bar" style="display:none;"></div>
     <div class="routes-list" id="routes-list">
       <p class="state-msg">Voer een locatie in en klik Zoeken.</p>
@@ -569,6 +639,7 @@ function selectRoute(id) {
     card.classList.add('active');
     card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
+  closePanel();
 }
 
 // ── Geocoding ─────────────────────────────────────────────────────────────────
@@ -681,6 +752,8 @@ function renderAll(routes) {
   const timeLabel = st ? ` om ${st.replace('T',' ')}` : '';
   const bronTekst = currentSource === 'saved' ? 'Strava routes' : 'eigen ritten';
   windBar.innerHTML = `💨 Wind${timeLabel}: <strong>${w.wind_speed} km/u uit het ${w.wind_dir_label}</strong> (${w.wind_direction}°) &nbsp;·&nbsp; ${routes.length} ${bronTekst} gevonden`;
+  updatePanelLabel(routes.length);
+  openPanel();
 
   // Wind arrow overlay
   const arrowBox = document.getElementById('wind-arrow-box');
@@ -875,6 +948,32 @@ function copyShareLink() {
     document.execCommand('copy');
     document.getElementById('share-copy-msg').style.display = 'block';
   });
+}
+
+// ── Mobile bottom sheet ──────────────────────────────────────────────────────
+const isMobile = () => window.innerWidth <= 640;
+
+function togglePanel() {
+  if (!isMobile()) return;
+  const sidebar = document.getElementById('sidebar');
+  sidebar.classList.toggle('panel-open');
+}
+
+function openPanel() {
+  if (!isMobile()) return;
+  document.getElementById('sidebar').classList.add('panel-open');
+}
+
+function closePanel() {
+  if (!isMobile()) return;
+  document.getElementById('sidebar').classList.remove('panel-open');
+}
+
+function updatePanelLabel(count) {
+  const lbl = document.getElementById('panel-handle-label');
+  if (!lbl) return;
+  if (count === 0) lbl.textContent = 'Geen routes gevonden';
+  else lbl.textContent = `${count} route${count !== 1 ? 's' : ''} gevonden  ▲`;
 }
 
 {% endif %}
