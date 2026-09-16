@@ -13,7 +13,11 @@ app.secret_key = os.getenv('SECRET_KEY', 'fallback-secret')
 
 CLIENT_ID = os.getenv('STRAVA_CLIENT_ID')
 CLIENT_SECRET = os.getenv('STRAVA_CLIENT_SECRET')
-REDIRECT_URI = os.getenv('REDIRECT_URI', 'http://localhost:5001/callback')
+_railway_domain = os.getenv('RAILWAY_PUBLIC_DOMAIN') or os.getenv('RAILWAY_STATIC_URL')
+if _railway_domain:
+    REDIRECT_URI = f'https://{_railway_domain}/callback'
+else:
+    REDIRECT_URI = os.getenv('REDIRECT_URI', 'http://localhost:5001/callback')
 
 # ── Strava OAuth ──────────────────────────────────────────────────────────────
 
