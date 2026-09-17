@@ -314,14 +314,17 @@
 
       .controls {
         padding: 8px 10px;
-        gap: 6px;
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        scrollbar-width: none;
+        gap: 7px;
+        flex-wrap: wrap;
       }
-      .controls::-webkit-scrollbar { display: none; }
+      /* Row 1: search input full width */
+      .search-wrap { width: 100%; min-width: 0; flex: none; }
+      .controls input[type=text] { width: 100%; }
+      /* Row 2: buttons + source toggle */
       #route-filters { display: none !important; }
       #start-time-label { display: none !important; }
+      #radius-label { display: none !important; }
+      .controls > span[title] { display: none !important; }
 
       .main {
         flex-direction: column;
@@ -450,7 +453,7 @@
     </select>
   </label>
   </span>
-  <label style="font-size:0.82rem;color:#718096;white-space:nowrap;">
+  <label id="radius-label" style="font-size:0.82rem;color:#718096;white-space:nowrap;">
     Straal:
     <select id="radius" style="margin-left:4px;">
       <option value="20">20 km</option>
